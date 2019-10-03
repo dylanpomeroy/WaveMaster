@@ -1,4 +1,5 @@
 import Victor from 'victor'
+import io from 'socket.io-client/dist/socket.io'
 
 const speed = 0.5
 
@@ -55,4 +56,20 @@ const update = () => {
     lastUpdate = Date.now()
 }
 
+var socket = io()
+var profileId = 0
+socket.on('newProfileId', (message) => {
+    console.log(`Received newProfileId message from server: ${message}`)
+    profileId = message['profileId']
+})
+
+var sendPositionToServer = () => {
+    console.log(`Sending current position to the server.`)
+    socket.emit('positionUpdate', {
+        'profileId': profileId,
+        'position': playerPosition.toString()
+    })
+}
+
+window.setInterval(() => sendPositionToServer(), 1)
 window.setInterval(() => update(), 1.0 / 60.0)

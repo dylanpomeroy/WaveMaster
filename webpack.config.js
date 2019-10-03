@@ -1,3 +1,10 @@
+const path = require('path')
+
 module.exports = {
-    watch: true
+    mode: 'development',
+    watch: true,
+    entry: './client',
+    output: {
+        path: path.resolve(`${__dirname}/dist/scripts`)
+    }
 }
