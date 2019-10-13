@@ -9,24 +9,36 @@ app.get('/', (req, res) => {
 })
 
 var usersConnected = 0
+var playerSockets = {}
 playerPositions = {}
 io.on('connection', (socket) => {
     console.log('a user connected')
-    socket.emit('newProfileId', { profileId: usersConnected })
+    const playerId = usersConnected
+    socket.emit('newProfileId', { profileId: playerId })
+    playerSockets[playerId] = socket
     usersConnected++
 
     socket.on('positionUpdate', (message) => {
-        console.log(`Received positionUpdate message: ${message}`)
         playerPositions[message['profileId']] = message['position']
-        console.log(`New player positions object: ${playerPositions}`)
     })
 
     socket.on('disconnect', () => {
-        console.log('user disconnected')
-        usersConnected--
+        console.log(`user disconnected. Removing ${playerId} from playerPositions.`)
+        delete playerSockets[playerId]
+        delete playerPositions[playerId]
+
+        for (const socket of Object.values(playerSockets)) {
+            socket.emit('playerDisconnected', playerId)
+        }
     })
 })
 
 http.listen(3000, () => {
     console.log('listening on *:3000')
 })
+
+setInterval(() => {
+    for (const socket of Object.values(playerSockets)) {
+        socket.emit('otherPlayerPositions', playerPositions)
+    }
+}, 10)

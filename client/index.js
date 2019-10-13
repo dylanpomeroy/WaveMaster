@@ -30,6 +30,8 @@ var keys = {
 }
 
 var playerPosition = new Victor(0, 0)
+var otherPlayerPositionsClient = {}
+var otherPlayerPositionsServer = {}
 var lastUpdate = null
 const update = () => {
     var moveVector = new Victor(0, 0)
@@ -49,9 +51,27 @@ const update = () => {
     c.height = window.innerHeight - 20
     var ctx = c.getContext("2d")
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-    ctx.beginPath();
-    ctx.arc(playerPosition.x, playerPosition.y, 20, 0, 2 * Math.PI);
-    ctx.stroke();
+    ctx.beginPath()
+    ctx.arc(playerPosition.x, playerPosition.y, 20, 0, 2 * Math.PI)
+    ctx.stroke()
+
+    ctx.font = "bold 20px Arial"
+    ctx.fillText(`Player ${profileId}`, playerPosition.x - 35, playerPosition.y + 40)
+
+    for (var playerPosKey of Object.keys(otherPlayerPositionsClient)) {
+        console.log(`Old client pos: ${JSON.stringify(otherPlayerPositionsClient[playerPosKey], null, 2)}`)
+        otherPlayerPositionsClient[playerPosKey].x = lerp(otherPlayerPositionsClient[playerPosKey].x, otherPlayerPositionsServer[playerPosKey].x, 0.1)
+        otherPlayerPositionsClient[playerPosKey].y = lerp(otherPlayerPositionsClient[playerPosKey].y, otherPlayerPositionsServer[playerPosKey].y, 0.1)
+        console.log(`New client pos: ${JSON.stringify(otherPlayerPositionsClient[playerPosKey], null, 2)}`)
+        
+        const positionVector = Victor.fromObject(otherPlayerPositionsClient[playerPosKey])
+        ctx.beginPath()
+        ctx.arc(positionVector.x, positionVector.y, 15, 0, 2 * Math.PI)
+        ctx.stroke()
+
+        ctx.font = "15px Arial"
+        ctx.fillText(`Player ${playerPosKey}`, positionVector.x - 30, positionVector.y + 30)
+    }
 
     lastUpdate = Date.now()
 }
@@ -64,12 +84,34 @@ socket.on('newProfileId', (message) => {
 })
 
 var sendPositionToServer = () => {
-    console.log(`Sending current position to the server.`)
     socket.emit('positionUpdate', {
         'profileId': profileId,
-        'position': playerPosition.toString()
+        'position': playerPosition.toObject()
     })
 }
 
-window.setInterval(() => sendPositionToServer(), 1)
-window.setInterval(() => update(), 1.0 / 60.0)
+socket.on('otherPlayerPositions', (message) => {
+    delete message[profileId]
+    otherPlayerPositionsServer = message
+
+    for (var playerPosKey of Object.keys(otherPlayerPositionsServer)) {
+        if (!(playerPosKey in otherPlayerPositionsClient)) {
+            console.log('Adding new player position!')
+            otherPlayerPositionsClient[playerPosKey] = {}
+            otherPlayerPositionsClient[playerPosKey].x = otherPlayerPositionsServer[playerPosKey].x
+            otherPlayerPositionsClient[playerPosKey].y = otherPlayerPositionsServer[playerPosKey].y
+        }
+    }
+})
+
+socket.on('playerDisconnected', (playerId) => {
+    delete otherPlayerPositionsClient[playerId]
+    delete otherPlayerPositionsServer[playerId]
+})
+
+var lerp = (start, end, amt) => {
+    return (1-amt)*start+amt*end
+}
+
+window.setInterval(() => sendPositionToServer(), 100)
+window.setInterval(() => update(), 1000 / 60)
